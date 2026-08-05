@@ -2,14 +2,12 @@ class Flow < Formula
   include Language::Python::Virtualenv
 
   desc "Statically typed language with algebraic effects, autodiff, and a C backend"
-  homepage "https://github.com/flooooooooooow/flow"
+  homepage "https://flooooooooooow.github.io/flow/"
   license "MIT"
+  url "https://github.com/flooooooooooow/flow/releases/download/v0.8.0/flow-v0.8.0.tar.gz"
+  sha256 "243df76f6c6f86b6886aa8a7f1ed549e82ca181d1c453f80199687dc21033962"
+  version "0.8.0"
   head "https://github.com/flooooooooooow/flow.git", branch: "main"
-
-  # Stable builds: cut a git tag (e.g. v0.1.0), then set url/sha256 and version.
-  #   url "https://github.com/flooooooooooow/flow/archive/refs/tags/v0.1.0.tar.gz"
-  #   sha256 "..."
-  #   version "0.1.0"
 
   depends_on "python@3.12"
 
@@ -17,7 +15,7 @@ class Flow < Formula
     # Keep the repo layout intact — the `flow` driver resolves SCRIPT_DIR via
     # realpath and expects src/, lib/, runtime/ next to itself.
     libexec.install "flow", "flow-lsp"
-    libexec.install "src", "lib", "runtime"
+    libexec.install "src", "lib", "runtime", "compiler"
     libexec.install "tools" if (buildpath/"tools").exist?
     libexec.install "wasm" if (buildpath/"wasm").exist?
     libexec.install "examples" if (buildpath/"examples").exist?
@@ -47,6 +45,8 @@ class Flow < Formula
       For MLIR / JIT support, also install LLVM and put it on PATH:
         brew install llvm
         export PATH="$(brew --prefix llvm)/bin:$PATH"
+
+      Installed Flow #{version}. Use `brew install --HEAD flow` for main.
     EOS
   end
 
