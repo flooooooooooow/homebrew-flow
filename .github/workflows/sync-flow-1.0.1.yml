@@ -1,0 +1,78 @@
+name: Sync Flow 1.0.1
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/sync-flow-1.0.1.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Wait for the qualified upstream release asset
+        shell: bash
+        run: |
+          url='https://github.com/flooooooooooow/flow/releases/download/v1.0.1/flow-v1.0.1.tar.gz'
+          for attempt in $(seq 1 30); do
+            if curl --fail --location --silent --show-error \
+              --output "$RUNNER_TEMP/flow-v1.0.1.tar.gz" "$url"; then
+              exit 0
+            fi
+            echo "Flow v1.0.1 release asset not published yet (attempt $attempt/30)"
+            sleep 20
+          done
+          echo '::error::Flow v1.0.1 release asset was not published'
+          exit 1
+
+      - name: Update formula from the published artifact
+        shell: bash
+        run: |
+          sha="$(sha256sum "$RUNNER_TEMP/flow-v1.0.1.tar.gz" | awk '{print $1}')"
+          SHA="$sha" python3 - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          path = Path('Formula/flow.rb')
+          text = path.read_text()
+          text, url_count = re.subn(
+              r'url "https://github\.com/flooooooooooow/flow/releases/download/v[^/]+/flow-v[^\"]+\.tar\.gz"',
+              'url "https://github.com/flooooooooooow/flow/releases/download/v1.0.1/flow-v1.0.1.tar.gz"',
+              text,
+              count=1,
+          )
+          text, sha_count = re.subn(r'sha256 "[0-9a-f]{64}"', f'sha256 "{os.environ["SHA"]}"', text, count=1)
+          text, version_count = re.subn(r'version "[^"]+"', 'version "1.0.1"', text, count=1)
+          if (url_count, sha_count, version_count) != (1, 1, 1):
+              raise SystemExit('could not update all Homebrew formula release fields')
+          path.write_text(text)
+          PY
+
+      - name: Verify archive and formula
+        shell: bash
+        run: |
+          tar -tzf "$RUNNER_TEMP/flow-v1.0.1.tar.gz" | grep -q '^flow-1.0.1/'
+          grep -q 'version "1.0.1"' Formula/flow.rb
+          grep -q 'releases/download/v1.0.1/flow-v1.0.1.tar.gz' Formula/flow.rb
+
+      - name: Commit the tap update
+        shell: bash
+        run: |
+          if git diff --quiet -- Formula/flow.rb; then
+            echo 'Formula already matches Flow 1.0.1'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add Formula/flow.rb
+          git commit -m 'flow: update formula to 1.0.1'
+          git push origin HEAD:main
